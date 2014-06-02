@@ -10,7 +10,7 @@ __status__ = "Production"
 import sys, serial, logging, configparser, time
 from PyQt4 import QtGui, QtCore
 
-comport = "/dev/ttyACM0"
+comport = "COM3"
 speed = 20000
 approach_speed = 2000
 offset = 30000
@@ -101,7 +101,7 @@ class Ui_Form(QtGui.QWidget):
         self.config.read('mono.cfg')
         self.current_wavelength = self.config.get('Mono_settings', 'current_wavelength')
         self.setWindowTitle('InputDialog')
-        self.setFixedSize(271, 125) 
+        self.setFixedSize(250, 100) 
 
         self.formLayout = QtGui.QFormLayout(self)
         self.currentWavelength = QtGui.QLabel(self)
