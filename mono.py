@@ -10,22 +10,21 @@ __status__ = "Production"
 import sys, serial, logging, configparser, time
 from PyQt4 import QtGui, QtCore
 
-comport = "COM3"
-speed = 20000
-approach_speed = 2000
-offset = 30000
-nm_per_revolution = 12.5 # as we're using a 1200 l/mm grating
-steps_per_revolution = 36000
-
 class Monochromator(object):
     ### Initialises a serial port
     def __init__(self):
-        self.mono = serial.Serial(comport, timeout=1)
         self.config = configparser.RawConfigParser()
         self.config.read('mono.cfg')
+        self.comport = self.config.get('Mono_settings', 'comport')
         self.current_wavelength = self.config.get('Mono_settings', 'current_wavelength')
-    
-    ### sends ascii commands to the serial port and pauses for half a second afterwards
+        self.speed = self.config.get('Mono_settings', 'speed')
+        self.approach_speed = self.config.get('Mono_settings', 'approach_speed')
+        self.offset = self.config.get('Mono_settings', 'offset')
+        self.nm_per_revolution = self.config.get('Mono_settings', 'nm_per_revolution')
+        self.steps_per_revolution = self.config.get('Mono_settings', 'steps_per_revolution')
+        self.mono = serial.Serial(self.comport, timeout=1)
+
+	### sends ascii commands to the serial port and pauses for half a second afterwards
     def sendcommand(self,command):
         self.mono.flushInput()
         self.mono.flushOutput()
@@ -45,7 +44,7 @@ class Monochromator(object):
             return a[0].rstrip('\r\n')
     
     ### sets the ramp speed
-    def setRampspeed(self, Rampspeed):
+    def setRampspeed(self, rampspeed):
         self.sendcommand('K ' + str(rampspeed))
         #time.sleep(3)
     
@@ -101,15 +100,15 @@ class Monochromator(object):
             print("Wavelength to approach: " + approach_wavelength + " nm")
             nm_difference = int(approach_wavelength) - int(self.current_wavelength)
             print("Difference in nm: " + str(nm_difference))
-            step_difference = round(((nm_difference / nm_per_revolution) * steps_per_revolution)+ offset)
+            step_difference = round(((float(nm_difference) / float(self.nm_per_revolution)) * float(self.steps_per_revolution))+ float(self.offset))
             print("Difference in steps: " + str(step_difference))  
-            time_needed_sec = abs(step_difference / speed) + abs(offset/approach_speed)
+            time_needed_sec = abs(step_difference / int(self.speed)) + abs(int(self.offset)/int(self.approach_speed))
             print("Time needed for operation: " + str(time_needed_sec) + " s")
             time_delay_for_progressbar = time_needed_sec / 100
-            self.sendcommand("V" + str(speed))
+            self.sendcommand("V" + str(self.speed))
             self.sendcommand(str(format(step_difference, '+')))
-            self.sendcommand("V" + str(approach_speed))
-            self.sendcommand("-" + str(offset))
+            self.sendcommand("V" + str(self.approach_speed))
+            self.sendcommand("-" + str(self.offset))
             while True:
                 Interface.approachButton.setEnabled(False)
                 time.sleep(time_delay_for_progressbar)
