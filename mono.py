@@ -3,7 +3,7 @@
 __author__ = "Benjamin Lebsanft"
 __copyright__ = "Copyright 2014, Benjamin Lebsanft, Monochromator class Copyright 2014, Arne Goos"
 __license__ = "Public Domain"
-__version__ = "0.95"
+__version__ = "1.0"
 __email__ = "benjamin@lebsanft.org"
 __status__ = "Production"
 
