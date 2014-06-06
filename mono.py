@@ -3,7 +3,7 @@
 __author__ = "Benjamin Lebsanft"
 __copyright__ = "Copyright 2014, Benjamin Lebsanft, Monochromator class copyright 2014, Arne Goos"
 __license__ = "Public Domain"
-__version__ = "1.0"
+__version__ = "1.0.1"
 __email__ = "benjamin@lebsanft.org"
 __status__ = "Production"
 
@@ -22,6 +22,7 @@ class Monochromator(object):
         self.offset = self.config.get('Mono_settings', 'offset')
         self.nm_per_revolution = self.config.get('Mono_settings', 'nm_per_revolution')
         self.steps_per_revolution = self.config.get('Mono_settings', 'steps_per_revolution')
+        self.calibration_offset = self.config.get('Mono_settings', 'calibration_offset')
         self.mono = serial.Serial(self.comport, timeout=1)
 
 	### sends ascii commands to the serial port and pauses for half a second afterwards
@@ -98,8 +99,8 @@ class Monochromator(object):
 
         if str.isdigit(approach_wavelength):
             print("Wavelength to approach: " + approach_wavelength + " nm")
-            nm_difference = int(approach_wavelength) - int(self.current_wavelength)
-            print("Difference in nm: " + str(nm_difference))
+            nm_difference = float(approach_wavelength) - float(self.current_wavelength) + float(self.calibration_offset)
+            print("Difference in nm [calibration offset of " + self.calibration_offset + " nm included]: " + str(nm_difference))
             step_difference = round(((float(nm_difference) / float(self.nm_per_revolution)) * float(self.steps_per_revolution))+ float(self.offset))
             print("Difference in steps: " + str(step_difference))  
             time_needed_sec = abs(step_difference / int(self.speed)) + abs(int(self.offset)/int(self.approach_speed))
