@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 __author__ = "Benjamin Lebsanft"
-__copyright__ = "Copyright 2014, Benjamin Lebsanft, Monochromator class Copyright 2014, Arne Goos"
+__copyright__ = "Copyright 2014, Benjamin Lebsanft, Monochromator class copyright 2014, Arne Goos"
 __license__ = "Public Domain"
 __version__ = "1.0"
 __email__ = "benjamin@lebsanft.org"
@@ -130,7 +130,7 @@ class Monochromator(object):
             MessageBox = QtGui.QMessageBox.warning(Interface,"Error:","Input is not numeric") 
         
 class Ui_Form(QtGui.QWidget):
-	### All UI elements go here
+    ### All UI elements go here
     def __init__(self, parent=None):
 
         QtGui.QWidget.__init__(self, parent)
