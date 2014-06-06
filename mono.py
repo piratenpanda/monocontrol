@@ -3,7 +3,7 @@
 __author__ = "Benjamin Lebsanft"
 __copyright__ = "Copyright 2014, Benjamin Lebsanft, Monochromator class Copyright 2014, Arne Goos"
 __license__ = "Public Domain"
-__version__ = "0.9"
+__version__ = "0.95"
 __email__ = "benjamin@lebsanft.org"
 __status__ = "Production"
 
@@ -21,6 +21,9 @@ class Monochromator(object):
     ### Initialises a serial port
     def __init__(self):
         self.mono = serial.Serial(comport, timeout=1)
+        self.config = configparser.RawConfigParser()
+        self.config.read('mono.cfg')
+        self.current_wavelength = self.config.get('Mono_settings', 'current_wavelength')
     
     ### sends ascii commands to the serial port and pauses for half a second afterwards
     def sendcommand(self,command):
@@ -91,82 +94,75 @@ class Monochromator(object):
         self.sendcommand("A24")
         self.sendcommand("F1000,0")
         self.sendcommand("A0")
-        
-class Ui_Form(QtGui.QWidget):
+		
+    def approachWL(self, approach_wavelength):
 
-    def __init__(self, parent=None):
-
-        QtGui.QWidget.__init__(self, parent)
-        self.config = configparser.RawConfigParser()
-        self.config.read('mono.cfg')
-        self.current_wavelength = self.config.get('Mono_settings', 'current_wavelength')
-        self.setWindowTitle('InputDialog')
-        self.setFixedSize(250, 100) 
-
-        self.formLayout = QtGui.QFormLayout(self)
-        self.currentWavelength = QtGui.QLabel(self)
-        self.currentWavelength.setAlignment(QtCore.Qt.AlignRight)
-        self.approachButton = QtGui.QPushButton(self)
-        self.approachButton.setObjectName("approachButton")
-        self.approachButton.clicked.connect(self.approachWL)
-        self.progressBar = QtGui.QProgressBar(self)
-        self.progressBar.setProperty("value", 0)
-        self.progressBar.setMaximum(101)
-        self.approachWavelength = QtGui.QLineEdit(self)
-        self.approachWavelength.setMaxLength(3)
-        self.approachWavelength.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
-        self.formLayout.addRow("Current Wavelength:", self.currentWavelength)
-        self.formLayout.addRow("Approach Wavelength:", self.approachWavelength)
-        self.formLayout.addRow(self.progressBar, self.approachButton)
-        self.setWindowTitle("Mission control")     
-        self.currentWavelength.setText(self.current_wavelength + " nm")
-        self.approachButton.setText("Approach")
-        self.setLayout(self.formLayout)
-        
-    def approachWL(self):
-        if str.isdigit(self.approachWavelength.text()):
-            print("Wavelength to approach: " + self.approachWavelength.text() + " nm")
-            nm_difference = int(self.approachWavelength.text()) - int(self.current_wavelength)
+        if str.isdigit(approach_wavelength):
+            print("Wavelength to approach: " + approach_wavelength + " nm")
+            nm_difference = int(approach_wavelength) - int(self.current_wavelength)
             print("Difference in nm: " + str(nm_difference))
             step_difference = round(((nm_difference / nm_per_revolution) * steps_per_revolution)+ offset)
             print("Difference in steps: " + str(step_difference))  
             time_needed_sec = abs(step_difference / speed) + abs(offset/approach_speed)
             print("Time needed for operation: " + str(time_needed_sec) + " s")
             time_delay_for_progressbar = time_needed_sec / 100
-            Mono1.sendcommand("V" + str(speed))
-            Mono1.sendcommand(str(format(step_difference, '+')))
-            Mono1.sendcommand("V" + str(approach_speed))
-            Mono1.sendcommand("-" + str(offset))
+            self.sendcommand("V" + str(speed))
+            self.sendcommand(str(format(step_difference, '+')))
+            self.sendcommand("V" + str(approach_speed))
+            self.sendcommand("-" + str(offset))
             while True:
-                self.approachButton.setEnabled(False)
+                Interface.approachButton.setEnabled(False)
                 time.sleep(time_delay_for_progressbar)
-                value = self.progressBar.value() + 1
-                self.progressBar.setValue(value)
+                value = Interface.progressBar.value() + 1
+                Interface.progressBar.setValue(value)
                 QtGui.qApp.processEvents()
-                if (value >= self.progressBar.maximum()):
-                    self.approachButton.setEnabled(True)
-                    self.progressBar.setValue(0)
-                    self.config.set('Mono_settings', 'current_wavelength', self.approachWavelength.text())
-                    self.current_wavelength = int(self.approachWavelength.text())
-                    self.currentWavelength.setText(str(self.current_wavelength) + " nm")
+                if (value >= Interface.progressBar.maximum()):
+                    Interface.approachButton.setEnabled(True)
+                    Interface.progressBar.setValue(0)
+                    self.config.set('Mono_settings', 'current_wavelength', approach_wavelength)
+                    self.current_wavelength = int(approach_wavelength)
+                    Interface.currentWavelengthLabel.setText(str(self.current_wavelength) + " nm")
                     f = open('mono.cfg',"w")
                     self.config.write(f)
                     break
                    
         else:
             print("Input is not numeric")
-            self.MessageBox = QtGui.QMessageBox.warning(self,
-                            "Error:",
-                            "Input is not numeric") 
+            MessageBox = QtGui.QMessageBox.warning(Interface,"Error:","Input is not numeric") 
+        
+class Ui_Form(QtGui.QWidget):
+	### All UI elements go here
+    def __init__(self, parent=None):
+
+        QtGui.QWidget.__init__(self, parent)
+        self.setWindowTitle('InputDialog')
+        self.setFixedSize(250, 100) 
+        self.formLayout = QtGui.QFormLayout(self)
+        self.currentWavelengthLabel = QtGui.QLabel(self)
+        self.currentWavelengthLabel.setAlignment(QtCore.Qt.AlignRight)
+        self.progressBar = QtGui.QProgressBar(self)
+        self.progressBar.setProperty("value", 0)
+        self.progressBar.setMaximum(101)
+        self.approachWavelengthInput = QtGui.QLineEdit(self)
+        self.approachWavelengthInput.setMaxLength(3)
+        self.approachWavelengthInput.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
+        self.approachButton = QtGui.QPushButton(self)
+        self.approachButton.setObjectName("approachButton")
+        self.approachButton.clicked.connect(lambda: Mono1.approachWL(self.approachWavelengthInput.text()))
+        self.formLayout.addRow("Current Wavelength:", self.currentWavelengthLabel)
+        self.formLayout.addRow("Approach Wavelength:", self.approachWavelengthInput)
+        self.formLayout.addRow(self.progressBar, self.approachButton)
+        self.setWindowTitle("Mission control")     
+        self.currentWavelengthLabel.setText(Mono1.current_wavelength + " nm")
+        self.approachButton.setText("Approach")
+        self.setLayout(self.formLayout)
 	
 if __name__ == "__main__":
 
     Mono1 = Monochromator()
     print("Initializing communication with Monochromator controller...")
-    Mono1.sendcommand(' ')
-        
+    Mono1.sendcommand(' ')        
     app = QtGui.QApplication(sys.argv)
-    icon = Ui_Form()
-    icon.show()
+    Interface = Ui_Form()
+    Interface.show()
     app.exec_()
-
