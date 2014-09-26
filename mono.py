@@ -3,7 +3,7 @@
 __author__ = "Benjamin Lebsanft"
 __copyright__ = "Copyright 2014, Benjamin Lebsanft, Monochromator class copyright 2014, Arne Goos"
 __license__ = "Public Domain"
-__version__ = "1.0.1"
+__version__ = "1.1.0"
 __email__ = "benjamin@lebsanft.org"
 __status__ = "Production"
 
@@ -95,7 +95,7 @@ class Monochromator(object):
         self.sendcommand("F1000,0")
         self.sendcommand("A0")
 		
-    def approachWL(self, approach_wavelength):
+    def approachWL(self, approach_wavelength, laser_wavelength):
 
         if str.isdigit(approach_wavelength):
             print("Wavelength to approach: " + approach_wavelength + " nm")
@@ -121,7 +121,7 @@ class Monochromator(object):
                     Interface.progressBar.setValue(0)
                     self.config.set('Mono_settings', 'current_wavelength', approach_wavelength)
                     self.current_wavelength = int(approach_wavelength)
-                    Interface.currentWavelengthLabel.setText(str(self.current_wavelength) + " nm")
+                    Interface.currentMonoWavelengthLabel.setText(str(self.current_wavelength) + " nm")
                     f = open('mono.cfg',"w")
                     self.config.write(f)
                     break
@@ -136,27 +136,75 @@ class Ui_Form(QtGui.QWidget):
 
         QtGui.QWidget.__init__(self, parent)
         self.setWindowTitle('InputDialog')
-        self.setFixedSize(250, 100) 
+        self.setFixedSize(300, 150) 
+
         self.formLayout = QtGui.QFormLayout(self)
-        self.currentWavelengthLabel = QtGui.QLabel(self)
-        self.currentWavelengthLabel.setAlignment(QtCore.Qt.AlignRight)
-        self.progressBar = QtGui.QProgressBar(self)
-        self.progressBar.setProperty("value", 0)
-        self.progressBar.setMaximum(101)
+        self.currentMonoWavelengthLabel = QtGui.QLabel(self)
+        self.currentMonoWavelengthLabel.setAlignment(QtCore.Qt.AlignRight)
+		
         self.approachWavelengthInput = QtGui.QLineEdit(self)
         self.approachWavelengthInput.setMaxLength(3)
         self.approachWavelengthInput.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
+        
+        self.currentLaserWavelengthInput = QtGui.QLineEdit(self)
+        self.currentLaserWavelengthInput.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
+        self.combo = QtGui.QComboBox(self)
+		
+        for key, value in Mono1.config.items('RamanPeaksOfSolvents'):
+            self.combo.addItem(key.title())
+
+        self.combo.currentIndexChanged.connect(self.check_combo_state)
+        self.combo.currentIndexChanged.emit(self.combo.currentIndex())
+		
+        self.approachWavelengthInput.textChanged.connect(self.check_state)
+        self.approachWavelengthInput.textChanged.emit(self.approachWavelengthInput.text())
+		
+        self.progressBar = QtGui.QProgressBar(self)
+        self.progressBar.setProperty("value", 0)
+        self.progressBar.setMaximum(101)
+		
         self.approachButton = QtGui.QPushButton(self)
         self.approachButton.setObjectName("approachButton")
-        self.approachButton.clicked.connect(lambda: Mono1.approachWL(self.approachWavelengthInput.text()))
-        self.formLayout.addRow("Current Wavelength:", self.currentWavelengthLabel)
-        self.formLayout.addRow("Approach Wavelength:", self.approachWavelengthInput)
+        self.approachButton.clicked.connect(lambda: Mono1.approachWL(self.approachWavelengthInput.text(),self.currentLaserWavelengthInput.text()))
+
+        self.formLayout.addRow("Solvent:", self.combo)		
+        self.formLayout.addRow("Current Laser Wavelength:", self.currentLaserWavelengthInput)
+        self.formLayout.addRow("Current Mono Wavelength:", self.currentMonoWavelengthLabel)
+        self.formLayout.addRow("Approach Mono Wavelength:", self.approachWavelengthInput)
+
         self.formLayout.addRow(self.progressBar, self.approachButton)
+
         self.setWindowTitle("Mission control")     
-        self.currentWavelengthLabel.setText(Mono1.current_wavelength + " nm")
+        self.currentMonoWavelengthLabel.setText(Mono1.current_wavelength + " nm")
         self.approachButton.setText("Approach")
         self.setLayout(self.formLayout)
 	
+    def getWavenumber(self, laserWL, monoWL):
+		
+        wavenumber = abs((1/int(laserWL)) - (1/int(monoWL)))*10000000
+        return int(round(wavenumber,0))
+
+    def check_combo_state(self, *args, **kwargs):
+	
+        solvent = self.combo.currentText()
+        global raman_peaks_with_offset
+        raman_peaks_list = Mono1.config.get('RamanPeaksOfSolvents', solvent)
+        raman_range = Mono1.config.get('Settings', 'peak_range')
+        raman_peaks = raman_peaks_list.split(",")
+        raman_peaks_with_offset = []
+        for i in range(len(raman_peaks)):
+            raman_peaks_with_offset += list(range(int(raman_peaks[i])-int(raman_range),int(raman_peaks[i])+int(raman_range)))        
+		
+    def check_state(self, *args, **kwargs):
+        if self.approachWavelengthInput.text() and self.currentLaserWavelengthInput.text():
+            wavenumbers = self.getWavenumber(self.currentLaserWavelengthInput.text(), self.approachWavelengthInput.text())
+            print(wavenumbers)
+            if wavenumbers in raman_peaks_with_offset:
+                color = '#f6989d' # red
+            else:
+                color = '#c4df9b' # green
+            self.approachWavelengthInput.setStyleSheet('background-color: %s' % color)
+		
 if __name__ == "__main__":
 
     Mono1 = Monochromator()
@@ -166,3 +214,4 @@ if __name__ == "__main__":
     Interface = Ui_Form()
     Interface.show()
     app.exec_()
+	
