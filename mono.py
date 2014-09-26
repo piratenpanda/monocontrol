@@ -95,7 +95,7 @@ class Monochromator(object):
         self.sendcommand("F1000,0")
         self.sendcommand("A0")
 		
-    def approachWL(self, approach_wavelength, laser_wavelength):
+    def approachWL(self, approach_wavelength):
 
         if str.isdigit(approach_wavelength):
             print("Wavelength to approach: " + approach_wavelength + " nm")
@@ -165,7 +165,7 @@ class Ui_Form(QtGui.QWidget):
 		
         self.approachButton = QtGui.QPushButton(self)
         self.approachButton.setObjectName("approachButton")
-        self.approachButton.clicked.connect(lambda: Mono1.approachWL(self.approachWavelengthInput.text(),self.currentLaserWavelengthInput.text()))
+        self.approachButton.clicked.connect(lambda: Mono1.approachWL(self.approachWavelengthInput.text()))
 
         self.formLayout.addRow("Solvent:", self.combo)		
         self.formLayout.addRow("Current Laser Wavelength:", self.currentLaserWavelengthInput)
