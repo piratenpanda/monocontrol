@@ -200,7 +200,7 @@ class Ui_Form(QtGui.QWidget):
             wavenumbers = self.getWavenumber(self.currentLaserWavelengthInput.text(), self.approachWavelengthInput.text())
             print(wavenumbers)
             if wavenumbers in raman_peaks_with_offset:
-                color = '#f6989d' # red
+                color = '#f6f498' # yellow
             else:
                 color = '#c4df9b' # green
             self.approachWavelengthInput.setStyleSheet('background-color: %s' % color)
