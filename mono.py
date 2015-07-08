@@ -39,11 +39,9 @@ class Monochromator(object):
     def readout(self):
         #time.sleep(0.5)
         #self.mono.flushInput()
-        a = self.mono.readlines()#[0].lstrip('\r\n')
-        if not a == []:
-            print('Readout : ' + a[0].rstrip('\r\n'))
-            logging.debug('Readout : ' + a[0].rstrip('\r\n'))
-            return a[0].rstrip('\r\n')
+        value = self.mono.readline().decode("utf-8")
+        print(value)
+        return str(value.rstrip().lstrip())
     
     ### sets the ramp speed
     def setRampspeed(self, rampspeed):
@@ -62,7 +60,8 @@ class Monochromator(object):
     def moving(self):
         self.sendcommand('^')
         a = self.readout()
-        if not a[-2] == '0':
+        print("Moving: " + a)
+        if a == "1":
             return True
         else:
             return False
@@ -84,17 +83,44 @@ class Monochromator(object):
         else:
             return False
         
-    def getHomePosition(): 
+    def checkHOMEstatus(self):
+        self.sendcommand("]")
+        value = self.mono.readline().decode("utf-8")
+        print("HOME Status complete: " + value)
+        print("HOME Status: " + value[3:])
+        return str(value[3:].rstrip())
+		
+    def getHomePosition(self): 
         self.sendcommand("A8")
-        self.sendcommand("]")
-        self.sendcommand("M+23000")
-        self.sendcommand("]")
-        self.sendcommand("@")
-        self.sendcommand("-108000")
-        self.sendcommand("+72000")
-        self.sendcommand("A24")
-        self.sendcommand("F1000,0")
-        self.sendcommand("A0")
+        self.checkHOMEstatus()
+        if(self.checkHOMEstatus().lstrip() == "32"):
+            self.sendcommand("M+23000")
+            while(self.checkHOMEstatus().lstrip() != "2"):
+                time.sleep(0.8)
+                self.checkHOMEstatus()
+
+            self.sendcommand("@")
+            self.sendcommand("-108000")
+		
+            while(self.moving() != True):
+                self.moving()
+				
+            self.sendcommand("+72000")
+
+            while(self.moving() != True):
+                self.moving()
+				
+            self.sendcommand("A24")
+	            
+            while(self.moving() != True):
+                self.moving()
+				
+            self.sendcommand("F1000,0")
+
+            while(self.moving() != True):
+                self.moving()
+				
+            self.sendcommand("A0")
 		
     def approachWL(self, approach_wavelength):		
         Interface.approachButton.setEnabled(False)
@@ -137,9 +163,18 @@ class Ui_Form(QtGui.QWidget):
 
         QtGui.QWidget.__init__(self, parent)
         self.setWindowTitle('InputDialog')
-        self.setFixedSize(300, 150) 
+        #self.setFixedSize(300, 150) 
 
-        self.formLayout = QtGui.QFormLayout(self)
+        tab_widget = QtGui.QTabWidget()
+        tab1 = QtGui.QWidget()
+        tab2 = QtGui.QWidget()
+        
+        p1_vertical = QtGui.QFormLayout(tab1)
+        p2_vertical = QtGui.QFormLayout(tab2)
+        
+        tab_widget.addTab(tab1, "Main")
+        tab_widget.addTab(tab2, "Advanced") 
+		
         self.currentMonoWavelengthLabel = QtGui.QLabel(self)
         self.currentMonoWavelengthLabel.setAlignment(QtCore.Qt.AlignRight)
 		
@@ -170,25 +205,34 @@ class Ui_Form(QtGui.QWidget):
         self.approachButton = QtGui.QPushButton(self)
         self.approachButton.setObjectName("approachButton")
         self.approachButton.clicked.connect(lambda: Mono1.approachWL(float(self.approachWavelengthInput.text())))
+        self.approachButton.setText("Approach")
+		
+        self.homeButton = QtGui.QPushButton(self)
+        self.homeButton.setObjectName("homeButton")
+        self.homeButton.clicked.connect(lambda: Mono1.getHomePosition())
+        self.homeButton.setText("Go to HOME position")
 
-        self.formLayout.addRow("Solvent:", self.combo)		
-        self.formLayout.addRow("Current Laser Wavelength:", self.currentLaserWavelengthInput)
-        self.formLayout.addRow("Current Mono Wavelength:", self.currentMonoWavelengthLabel)
-        self.formLayout.addRow("Approach Mono Wavelength:", self.approachWavelengthInput)
-
-        self.formLayout.addRow(self.progressBar, self.approachButton)
+        p1_vertical.addRow("Solvent:", self.combo)		
+        p1_vertical.addRow("Current Laser Wavelength:", self.currentLaserWavelengthInput)
+        p1_vertical.addRow("Current Mono Wavelength:", self.currentMonoWavelengthLabel)
+        p1_vertical.addRow("Approach Mono Wavelength:", self.approachWavelengthInput)
+        p1_vertical.addRow(self.progressBar, self.approachButton)
+		
+        p2_vertical.addRow("Go to home position:", self.homeButton)
 
         self.setWindowTitle("Mission control")     
         self.currentMonoWavelengthLabel.setText(Mono1.current_wavelength + " nm")
         self.currentLaserWavelengthInput.setText(Mono1.current_laser_wavelength + " nm")
-        self.approachButton.setText("Approach")
-        self.setLayout(self.formLayout)
+        		
+        vbox = QtGui.QVBoxLayout()
+        vbox.addWidget(tab_widget)
+        self.setLayout(vbox) 
 	
     def getWavenumber(self, laserWL, monoWL):
         if(monoWL != "."):
             wavenumber = abs((1/float(laserWL)) - (1/float(monoWL)))*10000000
             return int(round(wavenumber,0))
-
+			
     def check_combo_state(self, *args, **kwargs):	
         solvent = self.combo.currentText()
         global raman_peaks_with_offset
@@ -217,5 +261,6 @@ if __name__ == "__main__":
     app = QtGui.QApplication(sys.argv)
     Interface = Ui_Form()
     Interface.show()
+    Interface.setFixedSize(Interface.size());
     app.exec_()
 	
