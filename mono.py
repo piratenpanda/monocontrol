@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 __author__ = "Benjamin Lebsanft"
-__copyright__ = "Copyright 2014, Benjamin Lebsanft, Monochromator class copyright 2014, Arne Goos"
+__copyright__ = "Copyright 2015, Benjamin Grimm-Lebsanft, Monochromator class copyright 2014, Arne Goos"
 __license__ = "Public Domain"
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 __email__ = "benjamin@lebsanft.org"
 __status__ = "Production"
 
@@ -15,8 +15,9 @@ class Monochromator(object):
     def __init__(self):
         self.config = configparser.RawConfigParser()
         self.config.read('mono.cfg')
-        self.comport = self.config.get('Mono_settings', 'comport')
+        self.comport = self.config.get('Mono_settings', 'com_port')
         self.current_wavelength = self.config.get('Mono_settings', 'current_wavelength')
+        self.current_laser_wavelength = self.config.get('Settings', 'current_laser_wavelength')
         self.speed = self.config.get('Mono_settings', 'speed')
         self.approach_speed = self.config.get('Mono_settings', 'approach_speed')
         self.offset = self.config.get('Mono_settings', 'offset')
@@ -96,6 +97,7 @@ class Monochromator(object):
         self.sendcommand("A0")
 		
     def approachWL(self, approach_wavelength):
+	Interface.approachButton.setEnabled(False)
 
         if str.isdigit(approach_wavelength):
             print("Wavelength to approach: " + approach_wavelength + " nm")
@@ -111,7 +113,6 @@ class Monochromator(object):
             self.sendcommand("V" + str(self.approach_speed))
             self.sendcommand("-" + str(self.offset))
             while True:
-                Interface.approachButton.setEnabled(False)
                 time.sleep(time_delay_for_progressbar)
                 value = Interface.progressBar.value() + 1
                 Interface.progressBar.setValue(value)
@@ -120,15 +121,16 @@ class Monochromator(object):
                     Interface.approachButton.setEnabled(True)
                     Interface.progressBar.setValue(0)
                     self.config.set('Mono_settings', 'current_wavelength', approach_wavelength)
+                    self.config.set('Setting', 'current_laser_wavelength', self.current_laser_wavelength)
                     self.current_wavelength = int(approach_wavelength)
                     Interface.currentMonoWavelengthLabel.setText(str(self.current_wavelength) + " nm")
                     f = open('mono.cfg',"w")
                     self.config.write(f)
                     break
-                   
         else:
             print("Input is not numeric")
             MessageBox = QtGui.QMessageBox.warning(Interface,"Error:","Input is not numeric") 
+            Interface.approachButton.setEnabled(True)
         
 class Ui_Form(QtGui.QWidget):
     ### All UI elements go here
@@ -143,10 +145,13 @@ class Ui_Form(QtGui.QWidget):
         self.currentMonoWavelengthLabel.setAlignment(QtCore.Qt.AlignRight)
 		
         self.approachWavelengthInput = QtGui.QLineEdit(self)
-        self.approachWavelengthInput.setMaxLength(3)
+        self.approachWavelengthInput.setMaxLength(5)
+        self.approachWavelengthInput.setInputMask("000.0")
         self.approachWavelengthInput.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         
         self.currentLaserWavelengthInput = QtGui.QLineEdit(self)
+        self.currentLaserWavelengthInput.setMaxLength(5)
+        self.currentLaserWavelengthInput.setInputMask("000.0")
         self.currentLaserWavelengthInput.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         self.combo = QtGui.QComboBox(self)
 		
@@ -176,6 +181,7 @@ class Ui_Form(QtGui.QWidget):
 
         self.setWindowTitle("Mission control")     
         self.currentMonoWavelengthLabel.setText(Mono1.current_wavelength + " nm")
+        self.currentLaserWavelengthInput.setText(Mono1.current_laser_wavelength + " nm")
         self.approachButton.setText("Approach")
         self.setLayout(self.formLayout)
 	
