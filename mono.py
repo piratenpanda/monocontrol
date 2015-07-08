@@ -17,7 +17,7 @@ class Monochromator(object):
         self.config.read('mono.cfg')
         self.comport = self.config.get('Mono_settings', 'com_port')
         self.current_wavelength = self.config.get('Mono_settings', 'current_wavelength')
-        self.current_laser_wavelength = self.config.get('Settings', 'current_laser_wavelength')
+        self.current_laser_wavelength = self.config.get('Settings', 'laser_wavelength')
         self.speed = self.config.get('Mono_settings', 'speed')
         self.approach_speed = self.config.get('Mono_settings', 'approach_speed')
         self.offset = self.config.get('Mono_settings', 'offset')
@@ -96,11 +96,10 @@ class Monochromator(object):
         self.sendcommand("F1000,0")
         self.sendcommand("A0")
 		
-    def approachWL(self, approach_wavelength):
-	Interface.approachButton.setEnabled(False)
-
-        if str.isdigit(approach_wavelength):
-            print("Wavelength to approach: " + approach_wavelength + " nm")
+    def approachWL(self, approach_wavelength):		
+        Interface.approachButton.setEnabled(False)
+        if isinstance(approach_wavelength, float):
+            print("Wavelength to approach: " + str(approach_wavelength) + " nm")
             nm_difference = float(approach_wavelength) - float(self.current_wavelength) + float(self.calibration_offset)
             print("Difference in nm [calibration offset of " + self.calibration_offset + " nm included]: " + str(nm_difference))
             step_difference = round(((float(nm_difference) / float(self.nm_per_revolution)) * float(self.steps_per_revolution))+ float(self.offset))
@@ -121,8 +120,8 @@ class Monochromator(object):
                     Interface.approachButton.setEnabled(True)
                     Interface.progressBar.setValue(0)
                     self.config.set('Mono_settings', 'current_wavelength', approach_wavelength)
-                    self.config.set('Setting', 'current_laser_wavelength', self.current_laser_wavelength)
-                    self.current_wavelength = int(approach_wavelength)
+                    self.config.set('Settings', 'laser_wavelength', self.current_laser_wavelength)
+                    self.current_wavelength = approach_wavelength
                     Interface.currentMonoWavelengthLabel.setText(str(self.current_wavelength) + " nm")
                     f = open('mono.cfg',"w")
                     self.config.write(f)
@@ -146,12 +145,12 @@ class Ui_Form(QtGui.QWidget):
 		
         self.approachWavelengthInput = QtGui.QLineEdit(self)
         self.approachWavelengthInput.setMaxLength(5)
-        self.approachWavelengthInput.setInputMask("000.0")
+        self.approachWavelengthInput.setInputMask("999.9")
         self.approachWavelengthInput.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         
         self.currentLaserWavelengthInput = QtGui.QLineEdit(self)
         self.currentLaserWavelengthInput.setMaxLength(5)
-        self.currentLaserWavelengthInput.setInputMask("000.0")
+        self.currentLaserWavelengthInput.setInputMask("999.9")
         self.currentLaserWavelengthInput.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         self.combo = QtGui.QComboBox(self)
 		
@@ -170,7 +169,7 @@ class Ui_Form(QtGui.QWidget):
 		
         self.approachButton = QtGui.QPushButton(self)
         self.approachButton.setObjectName("approachButton")
-        self.approachButton.clicked.connect(lambda: Mono1.approachWL(self.approachWavelengthInput.text()))
+        self.approachButton.clicked.connect(lambda: Mono1.approachWL(float(self.approachWavelengthInput.text())))
 
         self.formLayout.addRow("Solvent:", self.combo)		
         self.formLayout.addRow("Current Laser Wavelength:", self.currentLaserWavelengthInput)
@@ -186,12 +185,11 @@ class Ui_Form(QtGui.QWidget):
         self.setLayout(self.formLayout)
 	
     def getWavenumber(self, laserWL, monoWL):
-		
-        wavenumber = abs((1/int(laserWL)) - (1/int(monoWL)))*10000000
-        return int(round(wavenumber,0))
+        if(monoWL != "."):
+            wavenumber = abs((1/float(laserWL)) - (1/float(monoWL)))*10000000
+            return int(round(wavenumber,0))
 
-    def check_combo_state(self, *args, **kwargs):
-	
+    def check_combo_state(self, *args, **kwargs):	
         solvent = self.combo.currentText()
         global raman_peaks_with_offset
         raman_peaks_list = Mono1.config.get('RamanPeaksOfSolvents', solvent)
