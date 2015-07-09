@@ -8,6 +8,7 @@ __email__ = "benjamin@lebsanft.org"
 __status__ = "Production"
 
 import sys, serial, logging, configparser, time
+import datetime as dt
 from PyQt4 import QtGui, QtCore
 
 class Monochromator(object):
@@ -24,7 +25,7 @@ class Monochromator(object):
         self.nm_per_revolution = self.config.get('Mono_settings', 'nm_per_revolution')
         self.steps_per_revolution = self.config.get('Mono_settings', 'steps_per_revolution')
         self.calibration_offset = self.config.get('Mono_settings', 'calibration_offset')
-        self.mono = serial.Serial(self.comport, timeout=1)
+        self.mono = serial.Serial(self.comport, timeout=1, baudrate=9600, xonxoff=1, stopbits=1)
 
 	### sends ascii commands to the serial port and pauses for half a second afterwards
     def sendcommand(self,command):
@@ -60,12 +61,9 @@ class Monochromator(object):
     def moving(self):
         self.sendcommand('^')
         a = self.readout()
-        print("Moving: " + a)
-        if a == "1":
-            return True
-        else:
-            return False
-        
+        print("Moving: " + "\"" + a[3:].lstrip() + "\"")
+        return a[3:].lstrip()
+			
     def checkfortimeout(self):
         try:
             self.sendcommand('X')
@@ -102,25 +100,37 @@ class Monochromator(object):
             self.sendcommand("@")
             self.sendcommand("-108000")
 		
-            while(self.moving() != True):
+            while(self.moving() != "0"):
                 self.moving()
 				
             self.sendcommand("+72000")
 
-            while(self.moving() != True):
+            while(self.moving() != "0"):
                 self.moving()
 				
             self.sendcommand("A24")
 	            
-            while(self.moving() != True):
+            while(self.moving() != "0"):
                 self.moving()
-				
+            
+            n1=dt.datetime.now()
+			
             self.sendcommand("F1000,0")
 
-            while(self.moving() != True):
+            while(self.moving() != "0"):
                 self.moving()
+                n2=dt.datetime.now()
+                if (((n2.microsecond-n1.microsecond)/1e6) >= 300):
+                    self.sendcommand("@")
+                    print("timeout, stopping")
+                    break
 				
             self.sendcommand("A0")
+            self.config.set('Mono_settings', 'current_wavelength', '524.9')
+            print("Homing done, setting current wavelength now to 524.9 nm according to mono manual")
+            f = open('mono.cfg',"w")
+            self.config.write(f)
+            Interface.currentMonoWavelengthLabel.setText("524.9 nm")
 		
     def approachWL(self, approach_wavelength):		
         Interface.approachButton.setEnabled(False)
