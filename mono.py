@@ -11,19 +11,15 @@ import sys, serial, logging, configparser, time
 import datetime as dt
 from PyQt4 import QtGui, QtCore
 
-def getWavenumber(self, laserWL, monoWL):
-    if(monoWL != "."):
-        wavenumber = abs((1/float(laserWL)) - (1/float(monoWL)))*10000000
-        return int(round(wavenumber,0))
-
 class Monochromator(object):
     ### Initialises a serial port
     def __init__(self):
-        self.mono = serial.Serial(self.comport, timeout=1, baudrate=9600, xonxoff=1, stopbits=1)
-
+	
         self.config = configparser.RawConfigParser()
         self.config.read('mono.cfg')
         self.comport = self.config.get('Mono_settings', 'com_port')
+        self.mono = serial.Serial(self.comport, timeout=1, baudrate=9600, xonxoff=1, stopbits=1)
+
         self.current_wavelength = self.config.get('Mono_settings', 'current_wavelength')
         self.current_laser_wavelength = self.config.get('Settings', 'laser_wavelength')
         self.speed = self.config.get('Mono_settings', 'speed')
@@ -31,13 +27,13 @@ class Monochromator(object):
         self.offset = self.config.get('Mono_settings', 'offset')
         self.nm_per_revolution = self.config.get('Mono_settings', 'nm_per_revolution')
         self.steps_per_revolution = self.config.get('Mono_settings', 'steps_per_revolution')
-        self.calibration_offset = self.config.get('Mono_settings', 'calibration_offset')
 
     ### sends ascii commands to the serial port and pauses for half a second afterwards
     def sendcommand(self,command):
         self.mono.flushInput()
         self.mono.flushOutput()
-        print('Send command: ' + command)
+        if (command != "^"):
+            print('Send command: ' + command)
         #logging.debug('Send command: ' + command)
         self.mono.write(bytearray(command + '\r\n','ascii'))
         time.sleep(0.5) 
@@ -66,8 +62,10 @@ class Monochromator(object):
         self.sendcommand('^')
         a = self.readout()
         if a[3:].lstrip() == "0":
+            print("Mono is not moving \r")
             return False
-        else
+        else:
+            print("Mono is moving \r")
             return True
 			
     def checkfortimeout(self):
@@ -81,7 +79,7 @@ class Monochromator(object):
     def checkLimitSwitches(self):
         self.sendcommand("]")
         a = self.readout()
-    if a[3:].lstrip() == "64":
+        if a[3:].lstrip() == "64":
             return "Upper"
         if a[3:].lstrip() == "128":
             return "Lower"
@@ -102,7 +100,7 @@ class Monochromator(object):
 
         ### move to 510 nm before starting the homing procedure
 
-        self.approachWL(510)
+        self.approachWL(510.0)
 
         while(self.moving()):
             self.moving()
@@ -206,19 +204,19 @@ class Ui_Form(QtGui.QWidget):
         tab_widget.addTab(tab1, "Main")
         tab_widget.addTab(tab2, "Advanced") 
 
-        ### create solvent combobox
-
-        self.combo = QtGui.QComboBox(self)
-		for key, value in Mono1.config.items('RamanPeaksOfSolvents'):
-            self.combo.addItem(key.title())
-        self.combo.currentIndexChanged.connect(self.check_combo_state)
-        self.combo.currentIndexChanged.emit(self.combo.currentIndex())
-
         ### create label for current mono wavelength
 		
         self.currentMonoWavelengthLabel = QtGui.QLabel(self)
         self.currentMonoWavelengthLabel.setAlignment(QtCore.Qt.AlignRight)
         self.currentMonoWavelengthLabel.setText(Mono1.current_wavelength + " nm")
+
+        ### create input field for current laser wavelength for Raman peak calculations
+        
+        self.currentLaserWavelengthInput = QtGui.QLineEdit(self)
+        self.currentLaserWavelengthInput.setMaxLength(5)
+        self.currentLaserWavelengthInput.setInputMask("999.9")
+        self.currentLaserWavelengthInput.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
+        self.currentLaserWavelengthInput.setText(Mono1.current_laser_wavelength + " nm")
 
         ### create input field for wavelength to approach
 
@@ -229,20 +227,20 @@ class Ui_Form(QtGui.QWidget):
         self.approachWavelengthInput.textChanged.connect(self.check_state)
         self.approachWavelengthInput.textChanged.emit(self.approachWavelengthInput.text())
 
+        ### create solvent combobox
+
+        self.combo = QtGui.QComboBox(self)
+        for key, value in Mono1.config.items('RamanPeaksOfSolvents'):
+            self.combo.addItem(key.title())
+        self.combo.currentIndexChanged.connect(self.check_combo_state)
+        self.combo.currentIndexChanged.emit(self.combo.currentIndex())
+
         ### create button to start the mono movement
 
         self.approachButton = QtGui.QPushButton(self)
         self.approachButton.setObjectName("approachButton")
         self.approachButton.clicked.connect(lambda: Mono1.approachWL(float(self.approachWavelengthInput.text())))
         self.approachButton.setText("Approach")
-
-        ### create input field for current laser wavelength for Raman peak calculations
-        
-        self.currentLaserWavelengthInput = QtGui.QLineEdit(self)
-        self.currentLaserWavelengthInput.setMaxLength(5)
-        self.currentLaserWavelengthInput.setInputMask("999.9")
-        self.currentLaserWavelengthInput.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
-        self.currentLaserWavelengthInput.setText(Mono1.current_laser_wavelength + " nm")
 
 		### create progress bar for mono movement progress indication
 		
@@ -256,7 +254,7 @@ class Ui_Form(QtGui.QWidget):
         self.homeButton.setObjectName("homeButton")
         self.homeButton.clicked.connect(lambda: Mono1.getHomePosition())
         self.homeButton.setText("HOME Monochromator")
-
+      
         ### put widgets into the QFormLayout of tab1
 
         p1_vertical.addRow("Solvent:", self.combo)
@@ -276,6 +274,11 @@ class Ui_Form(QtGui.QWidget):
         vbox.addWidget(tab_widget)
         self.setLayout(vbox) 
 
+    def getWavenumber(self, laserWL, monoWL):
+        if(monoWL != "."):
+            wavenumber = abs((1/float(laserWL)) - (1/float(monoWL)))*10000000
+            return int(round(wavenumber,0))
+        
     def check_combo_state(self, *args, **kwargs):
 
         ### This function creates an area around the Raman peaks of the solvent
@@ -283,7 +286,7 @@ class Ui_Form(QtGui.QWidget):
         ### the peak_range setting in the config file.
 
         global raman_peaks_with_offset
-
+        
         solvent = self.combo.currentText()
         raman_peaks_list = Mono1.config.get('RamanPeaksOfSolvents', solvent)
         raman_range = Mono1.config.get('Settings', 'peak_range')
@@ -299,14 +302,15 @@ class Ui_Form(QtGui.QWidget):
         ### peak_range the background of the input field will be green, otherwise
         ### a yellow background informs the user of a possible Raman feature.
 
-        if self.approachWavelengthInput.text() and self.currentLaserWavelengthInput.text():
-            wavenumbers = getWavenumber(self.currentLaserWavelengthInput.text(), self.approachWavelengthInput.text())
-            print(wavenumbers)
-            if wavenumbers in raman_peaks_with_offset:
-                color = '#f6f498' # yellow
-            else:
-                color = '#c4df9b' # green
-            self.approachWavelengthInput.setStyleSheet('background-color: %s' % color)
+        if self.approachWavelengthInput.text() != "NoneType" and self.currentLaserWavelengthInput.text() != "NoneType":
+            wavenumbers = self.getWavenumber(self.currentLaserWavelengthInput.text(), self.approachWavelengthInput.text())
+            if wavenumbers != None:
+                print("Distance to laser line in wavenumbers: " + str(wavenumbers) + " cm^-1")
+                if wavenumbers in raman_peaks_with_offset:
+                    color = '#f6f498' # yellow
+                else:
+                    color = '#c4df9b' # green
+                self.approachWavelengthInput.setStyleSheet('background-color: %s' % color)
 		
 if __name__ == "__main__":
 
